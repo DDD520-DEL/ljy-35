@@ -2,6 +2,10 @@ export type CrowdLevel = "loose" | "normal" | "crowded";
 
 export type VehicleStatus = "idle" | "running" | "arrived";
 
+export type PushStatus = "pending" | "sending" | "success" | "failed" | "cancelled";
+
+export type PushChannel = "wechat_template" | "sms" | "in_app";
+
 export interface Point {
   x: number;
   y: number;
@@ -44,6 +48,15 @@ export interface Vehicle {
   speed: number;
 }
 
+export interface User {
+  id: string;
+  openid?: string;
+  phone?: string;
+  nickname?: string;
+  avatar?: string;
+  createdAt: number;
+}
+
 export interface Reminder {
   id: string;
   routeId: string;
@@ -51,7 +64,49 @@ export interface Reminder {
   stationId: string;
   userId: string;
   notified: boolean;
+  pushStatus: PushStatus;
+  pushChannel: PushChannel;
+  triggerThreshold: number;
+  triggeredAt?: number;
   createdAt: number;
+}
+
+export interface WechatTemplateConfig {
+  appId: string;
+  appSecret: string;
+  templateId: string;
+}
+
+export interface WechatTemplateData {
+  first: { value: string; color?: string };
+  keyword1: { value: string; color?: string };
+  keyword2: { value: string; color?: string };
+  keyword3: { value: string; color?: string };
+  keyword4?: { value: string; color?: string };
+  remark: { value: string; color?: string };
+}
+
+export interface PushRecord {
+  id: string;
+  reminderId: string;
+  userId: string;
+  channel: PushChannel;
+  status: PushStatus;
+  retryCount: number;
+  maxRetries: number;
+  nextRetryAt?: number;
+  lastError?: string;
+  payload: string;
+  sentAt?: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface ApiResponse<T = unknown> {
+  success: boolean;
+  data?: T;
+  error?: string;
+  message?: string;
 }
 
 export interface TripRecord {

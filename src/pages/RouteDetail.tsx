@@ -18,7 +18,6 @@ import { useAppStore } from "@/store";
 import { calculateETA, getCrowdColor, getCrowdText, formatDuration } from "@/utils/geometry";
 import type { Station, Vehicle } from "@shared/types";
 import { cn } from "@/lib/utils";
-import { generateUID } from "@/utils/geometry";
 
 export default function RouteDetail() {
   const { id = "" } = useParams();
@@ -84,7 +83,7 @@ export default function RouteDetail() {
     setSelectedStationId(station.id);
   };
 
-  const handleCreateReminder = (stationId: string) => {
+  const handleCreateReminder = async (stationId: string) => {
     if (!nearestToSelectedStation) return;
     const existing = reminders.find(
       (r) => r.stationId === stationId && r.vehicleId === nearestToSelectedStation.vehicle.id && !r.notified
@@ -92,12 +91,19 @@ export default function RouteDetail() {
     if (existing) {
       return;
     }
-    createReminder({
+    await createReminder({
       routeId: route.id,
       vehicleId: nearestToSelectedStation.vehicle.id,
       stationId,
     });
     setSelectedStationId(stationId);
+  };
+
+  const handleCancelReminder = async (reminderId: string) => {
+    const rem = reminders.find((r) => r.id === reminderId);
+    if (rem && rem.pushStatus !== "success") {
+      await useAppStore.getState().cancelReminder(reminderId);
+    }
   };
 
   const totalRunTime = selectedVehicle?.startTimestamp
@@ -200,6 +206,20 @@ export default function RouteDetail() {
                     <div className="space-y-2 mt-4">
                       {activeReminders.map((r) => {
                         const st = route.stations.find((s) => s.id === r.stationId);
+                        const statusLabel = {
+                          pending: "等待触发",
+                          sending: "发送中",
+                          success: "已推送",
+                          failed: "推送失败",
+                          cancelled: "已取消",
+                        }[r.pushStatus];
+                        const statusColor = {
+                          pending: "text-slate-400",
+                          sending: "text-amber-400",
+                          success: "text-emerald-400",
+                          failed: "text-rose-400",
+                          cancelled: "text-slate-500",
+                        }[r.pushStatus];
                         return (
                           <div
                             key={r.id}
@@ -210,10 +230,21 @@ export default function RouteDetail() {
                               <p className="text-sm text-white truncate">
                                 即将到达 <span className="font-semibold">{st?.name}</span>
                               </p>
-                              <p className="text-xs text-slate-400">
-                                正在监听班车位置
+                              <p className="text-xs flex items-center gap-2">
+                                <span className={statusColor}>{statusLabel}</span>
+                                <span className="text-slate-500">·</span>
+                                <span className="text-slate-500">微信模板消息</span>
                               </p>
                             </div>
+                            {r.pushStatus !== "success" && r.pushStatus !== "cancelled" && (
+                              <button
+                                onClick={() => handleCancelReminder(r.id)}
+                                className="px-2.5 py-1 rounded-lg text-xs text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                                title="取消提醒"
+                              >
+                                取消
+                              </button>
+                            )}
                           </div>
                         );
                       })}

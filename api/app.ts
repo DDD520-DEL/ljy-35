@@ -5,17 +5,14 @@
 import express, {
   type Request,
   type Response,
-  type NextFunction,
 } from 'express'
 import cors from 'cors'
-import path from 'path'
 import dotenv from 'dotenv'
-import { fileURLToPath } from 'url'
 import authRoutes from './routes/auth.js'
 import shuttleRoutes from './routes/shuttle.js'
-
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
+import reminderRoutes from './routes/reminder.js'
+import { vehicleTrackingService } from './services/vehicleTrackingService.js'
+import { wechatPushService } from './services/wechatPushService.js'
 
 dotenv.config()
 
@@ -27,10 +24,14 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 
 app.use('/api/auth', authRoutes)
 app.use('/api/shuttle', shuttleRoutes)
+app.use('/api/reminder', reminderRoutes)
+
+vehicleTrackingService.start()
+wechatPushService.start()
 
 app.use(
   '/api/health',
-  (req: Request, res: Response, _next: NextFunction): void => {
+  (req: Request, res: Response): void => {
     res.status(200).json({
       success: true,
       message: 'Shuttle Tracking API - OK',
@@ -39,7 +40,7 @@ app.use(
   },
 )
 
-app.use((_error: Error, _req: Request, res: Response, _next: NextFunction) => {
+app.use((_error: Error, _req: Request, res: Response): void => {
   res.status(500).json({
     success: false,
     error: 'Server internal error',

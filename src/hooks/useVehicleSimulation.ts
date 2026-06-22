@@ -1,12 +1,14 @@
+import { useEffect, useRef } from "react";
 import { useAppStore } from "@/store";
 import { getPositionOnPath, getCurrentStationIndex } from "@/utils/geometry";
-import type { Route, Vehicle } from "@shared/types";
+import type { Route, Vehicle, Reminder } from "@shared/types";
 
 const PROGRESS_INCREMENT_PER_TICK = 0.008;
 const TICK_INTERVAL_MS = 2000;
 
 let nextTimerId: number | null = null;
 let isInitialized = false;
+const lastNotifiedToastReminders = new Set<string>();
 
 export const startVehicleSimulation = () => {
   if (isInitialized) return;
@@ -45,18 +47,32 @@ export const startVehicleSimulation = () => {
         }
 
         const currentReminders = useAppStore.getState().reminders;
-        currentReminders.forEach((rem) => {
+        currentReminders.forEach((rem: Reminder) => {
           if (rem.notified || rem.vehicleId !== vehicle.id) return;
           const station = route.stations.find((s) => s.id === rem.stationId);
           if (!station) return;
           const stationIndexMatch = route.stations.findIndex((s) => s.id === rem.stationId);
           if (stationIndexMatch >= 0 && stationIndex >= stationIndexMatch) {
             markReminderNotified(rem.id);
-            addToast({
-              type: "success",
-              message: `🔔 ${station.name} 站即将到达！请准备下车`,
-              duration: 5000,
-            });
+
+            if (rem.pushStatus === "success" && !lastNotifiedToastReminders.has(rem.id)) {
+              lastNotifiedToastReminders.add(rem.id);
+              addToast({
+                type: "success",
+                message: `🔔 微信通知已发送：${station.name} 站即将到达！`,
+                duration: 5000,
+              });
+            } else if (
+              (rem.pushStatus === "pending" || rem.pushStatus === "failed" || rem.pushStatus === "sending") &&
+              !lastNotifiedToastReminders.has(rem.id)
+            ) {
+              lastNotifiedToastReminders.add(rem.id);
+              addToast({
+                type: "info",
+                message: `🔔 ${station.name} 站即将到达！微信通知推送中...`,
+                duration: 5000,
+              });
+            }
           }
         });
       });
@@ -72,5 +88,18 @@ export const startVehicleSimulation = () => {
 
 export const useVehicleSimulation = () => {
   const vehicles = useAppStore((s) => s.vehicles);
+  const syncFromServer = useAppStore((s) => s.syncFromServer);
+  const didInitRef = useRef(false);
+
+  useEffect(() => {
+    if (didInitRef.current) return;
+    didInitRef.current = true;
+
+    syncFromServer().catch((err) => console.warn("[VehicleSim] initial sync failed:", err));
+
+    startVehicleSimulation();
+  }, [syncFromServer]);
+
+  void nextTimerId;
   return { vehicles };
 };
