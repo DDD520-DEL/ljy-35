@@ -11,6 +11,7 @@ import dotenv from 'dotenv'
 import authRoutes from './routes/auth.js'
 import shuttleRoutes from './routes/shuttle.js'
 import reminderRoutes from './routes/reminder.js'
+import checkinRoutes from './routes/checkin.js'
 import { vehicleTrackingService } from './services/vehicleTrackingService.js'
 import { wechatPushService } from './services/wechatPushService.js'
 
@@ -25,6 +26,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 app.use('/api/auth', authRoutes)
 app.use('/api/shuttle', shuttleRoutes)
 app.use('/api/reminder', reminderRoutes)
+app.use('/api/checkin', checkinRoutes)
 
 vehicleTrackingService.start()
 wechatPushService.start()

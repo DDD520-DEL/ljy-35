@@ -8,6 +8,9 @@ import type {
   UserRole,
   CrowdLevel,
   ApiResponse,
+  CheckInRecord,
+  RideStats,
+  ActiveTrip,
 } from "@shared/types";
 import { MOCK_ROUTES, MOCK_VEHICLES, MOCK_PUNCTUALITY_STATS } from "@/data/mockData";
 
@@ -24,6 +27,19 @@ interface AppState {
   selectedRouteId: string | null;
   driverVehicleId: string | null;
   lastServerSync: number;
+  checkInRecords: CheckInRecord[];
+  activeCheckIn: CheckInRecord | null;
+  rideStats: RideStats[];
+  activeTrip: ActiveTrip | null;
+  qrCodeData: {
+    token: string;
+    tripId: string;
+    expiresAt: number;
+    qrData: string;
+    passengerCount: number;
+    routeName: string;
+    stationName: string;
+  } | null;
 
   setUserRole: (role: UserRole) => void;
   setSelectedRouteId: (id: string | null) => void;
@@ -33,6 +49,14 @@ interface AppState {
   updateVehicleStatus: (vehicleId: string, status: Vehicle["status"], startTimestamp?: number) => void;
 
   submitCrowdFeedback: (vehicleId: string, level: CrowdLevel) => Promise<void>;
+
+  generateQRCode: (vehicleId: string, stationId: string) => Promise<void>;
+  refreshQRCode: () => Promise<void>;
+  clearQRCode: () => void;
+  passengerCheckIn: (token: string) => Promise<CheckInRecord | null>;
+  fetchActiveCheckIn: () => Promise<void>;
+  fetchRideStats: (date: string, routeId?: string) => Promise<void>;
+  fetchCheckInRecords: (filters?: { userId?: string; vehicleId?: string; routeId?: string; date?: string }) => Promise<void>;
 
   createReminder: (reminder: Omit<Reminder, "id" | "userId" | "notified" | "pushStatus" | "pushChannel" | "triggerThreshold" | "createdAt"> & {
     pushChannel?: Reminder["pushChannel"];
@@ -83,6 +107,11 @@ export const useAppStore = create<AppState>((set, get) => {
     selectedRouteId: null,
     driverVehicleId: null,
     lastServerSync: 0,
+    checkInRecords: [],
+    activeCheckIn: null,
+    rideStats: [],
+    activeTrip: null,
+    qrCodeData: null,
 
     setUserRole: (role) => set({ userRole: role }),
     setSelectedRouteId: (id) => set({ selectedRouteId: id }),
@@ -148,6 +177,134 @@ export const useAppStore = create<AppState>((set, get) => {
         }),
       }));
       get().addToast({ type: "success", message: "感谢您的反馈！", duration: 2500 });
+    },
+
+    generateQRCode: async (vehicleId, stationId) => {
+      try {
+        const res = await apiFetch<{
+          token: string;
+          tripId: string;
+          expiresAt: number;
+          qrData: string;
+          passengerCount: number;
+          routeName: string;
+          stationName: string;
+        }>("/checkin/qrcode/generate", {
+          method: "POST",
+          body: JSON.stringify({ vehicleId, stationId }),
+        });
+
+        if (!res.success || !res.data) {
+          throw new Error(res.error || "生成二维码失败");
+        }
+
+        set({ qrCodeData: res.data });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "生成二维码失败";
+        console.error("[Store] generate QR code failed:", err);
+        get().addToast({ type: "error", message: msg, duration: 3000 });
+      }
+    },
+
+    refreshQRCode: async () => {
+      const { driverVehicleId, routes, vehicles } = get();
+      if (!driverVehicleId) return;
+
+      const vehicle = vehicles.find((v) => v.id === driverVehicleId);
+      if (!vehicle) return;
+
+      const route = routes.find((r) => r.id === vehicle.routeId);
+      const stationId = route?.stations[vehicle.currentStationIndex]?.id;
+      if (!stationId) return;
+
+      await get().generateQRCode(driverVehicleId, stationId);
+    },
+
+    clearQRCode: () => {
+      set({ qrCodeData: null });
+    },
+
+    passengerCheckIn: async (token) => {
+      try {
+        const res = await apiFetch<CheckInRecord & {
+          vehiclePlate: string;
+          routeName: string;
+          stationName: string;
+          crowdLevel: CrowdLevel;
+          passengerCount: number;
+        }>("/checkin/checkin", {
+          method: "POST",
+          body: JSON.stringify({ token, userId: MOCK_USER_ID }),
+        });
+
+        if (!res.success || !res.data) {
+          throw new Error(res.error || "签到失败");
+        }
+
+        set({ activeCheckIn: res.data });
+        get().addToast({ type: "success", message: "签到成功！祝您乘车愉快", duration: 3000 });
+
+        void get().syncFromServer();
+
+        return res.data;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "签到失败";
+        console.error("[Store] check in failed:", err);
+        get().addToast({ type: "error", message: msg, duration: 3000 });
+        return null;
+      }
+    },
+
+    fetchActiveCheckIn: async () => {
+      try {
+        const res = await apiFetch<CheckInRecord & {
+          vehiclePlate: string;
+          routeName: string;
+          crowdLevel: CrowdLevel;
+        }>(`/checkin/active/${MOCK_USER_ID}`);
+
+        if (res.success && res.data) {
+          set({ activeCheckIn: res.data });
+        } else {
+          set({ activeCheckIn: null });
+        }
+      } catch (err) {
+        console.warn("[Store] fetch active check-in failed:", err);
+      }
+    },
+
+    fetchRideStats: async (date, routeId) => {
+      try {
+        const params = new URLSearchParams();
+        params.set("date", date);
+        if (routeId) params.set("routeId", routeId);
+
+        const res = await apiFetch<RideStats[]>(`/checkin/stats?${params.toString()}`);
+
+        if (res.success && res.data) {
+          set({ rideStats: res.data });
+        }
+      } catch (err) {
+        console.warn("[Store] fetch ride stats failed:", err);
+      }
+    },
+
+    fetchCheckInRecords: async (filters) => {
+      try {
+        const params = new URLSearchParams();
+        if (filters?.userId) params.set("userId", filters.userId);
+        if (filters?.vehicleId) params.set("vehicleId", filters.vehicleId);
+        if (filters?.routeId) params.set("routeId", filters.routeId);
+        if (filters?.date) params.set("date", filters.date);
+
+        const res = await apiFetch<CheckInRecord[]>(`/checkin/records?${params.toString()}`);
+
+        if (res.success && res.data) {
+          set({ checkInRecords: res.data });
+        }
+      } catch (err) {
+        console.warn("[Store] fetch check-in records failed:", err);
+      }
     },
 
     createReminder: async (reminder) => {

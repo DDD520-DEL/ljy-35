@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Play,
   Square,
@@ -12,8 +12,11 @@ import {
   Gauge,
   Thermometer,
   ChevronDown,
+  QrCode,
+  Users,
 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
+import QRCodeDisplay from "@/components/QRCodeDisplay";
 import { useAppStore } from "@/store";
 import { formatDuration } from "@/utils/geometry";
 import { cn } from "@/lib/utils";
@@ -27,6 +30,10 @@ export default function DriverConsole() {
   const driverVehicleId = useAppStore((s) => s.driverVehicleId);
   const setDriverVehicleId = useAppStore((s) => s.setDriverVehicleId);
   const addToast = useAppStore((s) => s.addToast);
+  const qrCodeData = useAppStore((s) => s.qrCodeData);
+  const generateQRCode = useAppStore((s) => s.generateQRCode);
+  const refreshQRCode = useAppStore((s) => s.refreshQRCode);
+  const clearQRCode = useAppStore((s) => s.clearQRCode);
 
   const [selectedRouteId, setSelectedRouteId] = useState<string>(routes[0]?.id ?? "");
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>(
@@ -71,6 +78,12 @@ export default function DriverConsole() {
     setDriverVehicleId(vehicle.id);
     setIsRunning(true);
     setElapsedSeconds(0);
+
+    const firstStationId = route.stations[0]?.id;
+    if (firstStationId) {
+      void generateQRCode(vehicle.id, firstStationId);
+    }
+
     addToast({
       type: "success",
       message: `GPS 已开启 · ${route.name} 班车开始运行`,
@@ -82,6 +95,7 @@ export default function DriverConsole() {
     if (!vehicle) return;
     updateVehicleStatus(vehicle.id, "idle");
     setIsRunning(false);
+    clearQRCode();
     addToast({
       type: completed ? "success" : "info",
       message: completed
@@ -90,6 +104,10 @@ export default function DriverConsole() {
       duration: 3500,
     });
   };
+
+  const handleRefreshQRCode = useCallback(() => {
+    void refreshQRCode();
+  }, [refreshQRCode]);
 
   const totalStations = route?.stations.length ?? 0;
   const currentStationName = route?.stations[vehicle?.currentStationIndex ?? 0]?.name ?? "--";
@@ -329,6 +347,51 @@ export default function DriverConsole() {
                   )}
                 </div>
               </div>
+
+              {isRunning && qrCodeData && (
+                <div className="p-6 rounded-2xl glass border border-slate-700/40 relative overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-br from-sky-500/5 via-transparent to-transparent pointer-events-none" />
+                  <div className="relative">
+                    <div className="flex items-center gap-2 mb-5">
+                      <QrCode size={18} className="text-sky-400" />
+                      <h3 className="font-display font-semibold text-white">乘客签到二维码</h3>
+                    </div>
+
+                    <div className="flex justify-center">
+                      <QRCodeDisplay
+                        qrData={qrCodeData.qrData}
+                        token={qrCodeData.token}
+                        routeName={qrCodeData.routeName}
+                        stationName={qrCodeData.stationName}
+                        passengerCount={qrCodeData.passengerCount}
+                        expiresAt={qrCodeData.expiresAt}
+                        onRefresh={handleRefreshQRCode}
+                        size={200}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {isRunning && (
+                <div className="p-6 rounded-2xl glass border border-slate-700/40">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Users size={18} className="text-emerald-400" />
+                    <h3 className="font-display font-semibold text-white">本班次签到</h3>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-3xl font-bold text-white count-number">
+                        {qrCodeData?.passengerCount ?? 0}
+                      </div>
+                      <div className="text-xs text-slate-500">已签到乘客</div>
+                    </div>
+                    <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 flex items-center justify-center">
+                      <Users size={28} className="text-emerald-400" />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="col-span-12 lg:col-span-8 space-y-6">

@@ -6,6 +6,9 @@ import type {
   User,
   PushStatus,
   PushChannel,
+  CheckInRecord,
+  RideStats,
+  ActiveTrip,
 } from "@shared/types";
 import { MOCK_ROUTES, MOCK_VEHICLES } from "../../src/data/mockData.js";
 
@@ -16,6 +19,9 @@ class DataStore {
   private pushRecords: PushRecord[] = [];
   private users: User[] = [];
   private sentDedupeKeys = new Set<string>();
+  private checkInRecords: CheckInRecord[] = [];
+  private activeTrips: Map<string, ActiveTrip> = new Map();
+  private qrTokens: Map<string, { vehicleId: string; tripId: string; expiresAt: number }> = new Map();
 
   getRoutes(): Route[] {
     return this.routes;
@@ -227,6 +233,204 @@ class DataStore {
       }
     });
     keysToRemove.forEach((k) => this.sentDedupeKeys.delete(k));
+  }
+
+  startTrip(vehicleId: string, routeId: string, startStationId: string): ActiveTrip {
+    const tripId = this.generateId("trip");
+    const trip: ActiveTrip = {
+      id: tripId,
+      vehicleId,
+      routeId,
+      startTime: Date.now(),
+      startStationId,
+      currentStationIndex: 0,
+      passengerCount: 0,
+      checkInRecords: [],
+    };
+    this.activeTrips.set(vehicleId, trip);
+    return trip;
+  }
+
+  endTrip(vehicleId: string): ActiveTrip | undefined {
+    const trip = this.activeTrips.get(vehicleId);
+    if (trip) {
+      trip.checkInRecords.forEach((record) => {
+        if (record.status === "active") {
+          record.status = "completed";
+        }
+      });
+      this.activeTrips.delete(vehicleId);
+    }
+    return trip;
+  }
+
+  getActiveTrip(vehicleId: string): ActiveTrip | undefined {
+    return this.activeTrips.get(vehicleId);
+  }
+
+  updateTripStation(vehicleId: string, stationIndex: number): void {
+    const trip = this.activeTrips.get(vehicleId);
+    if (trip) {
+      trip.currentStationIndex = stationIndex;
+    }
+  }
+
+  generateQRToken(vehicleId: string, stationId: string): { token: string; tripId: string; expiresAt: number } {
+    let trip = this.activeTrips.get(vehicleId);
+    if (!trip) {
+      const vehicle = this.getVehicleById(vehicleId);
+      if (!vehicle) throw new Error("Vehicle not found");
+      trip = this.startTrip(vehicleId, vehicle.routeId, stationId);
+    }
+    const token = this.generateId("qr");
+    const expiresAt = Date.now() + 60 * 1000;
+    this.qrTokens.set(token, { vehicleId, tripId: trip.id, expiresAt });
+    return { token, tripId: trip.id, expiresAt };
+  }
+
+  validateQRToken(token: string): { vehicleId: string; tripId: string } | null {
+    const tokenData = this.qrTokens.get(token);
+    if (!tokenData) return null;
+    if (tokenData.expiresAt < Date.now()) {
+      this.qrTokens.delete(token);
+      return null;
+    }
+    return { vehicleId: tokenData.vehicleId, tripId: tokenData.tripId };
+  }
+
+  cleanExpiredQRTokens(): void {
+    const now = Date.now();
+    this.qrTokens.forEach((data, token) => {
+      if (data.expiresAt < now) {
+        this.qrTokens.delete(token);
+      }
+    });
+  }
+
+  checkIn(userId: string, token: string): CheckInRecord | null {
+    const tokenData = this.validateQRToken(token);
+    if (!tokenData) return null;
+
+    const trip = this.activeTrips.get(tokenData.vehicleId);
+    if (!trip) return null;
+
+    const vehicle = this.getVehicleById(tokenData.vehicleId);
+    if (!vehicle) return null;
+
+    const existingCheckIn = trip.checkInRecords.find(
+      (r) => r.userId === userId && r.status === "active"
+    );
+    if (existingCheckIn) return existingCheckIn;
+
+    const route = this.getRouteById(vehicle.routeId);
+    const currentStation = route?.stations[trip.currentStationIndex];
+
+    const record: CheckInRecord = {
+      id: this.generateId("ci"),
+      userId,
+      vehicleId: tokenData.vehicleId,
+      routeId: vehicle.routeId,
+      stationId: currentStation?.id ?? trip.startStationId,
+      checkInTime: Date.now(),
+      tripId: trip.id,
+      status: "active",
+    };
+
+    this.checkInRecords.push(record);
+    trip.checkInRecords.push(record);
+    trip.passengerCount = trip.checkInRecords.filter((r) => r.status === "active").length;
+
+    const totalPassengers = trip.passengerCount;
+    if (totalPassengers > 0) {
+      const capacity = 30;
+      const crowdRatio = totalPassengers / capacity;
+      let crowdLevel: "loose" | "normal" | "crowded" = "normal";
+      if (crowdRatio < 0.4) crowdLevel = "loose";
+      else if (crowdRatio > 0.7) crowdLevel = "crowded";
+
+      const veh = this.vehicles.find((v) => v.id === tokenData.vehicleId);
+      if (veh) {
+        veh.crowdLevel = crowdLevel;
+      }
+    }
+
+    return record;
+  }
+
+  getCheckInRecords(filters?: {
+    userId?: string;
+    vehicleId?: string;
+    routeId?: string;
+    date?: string;
+  }): CheckInRecord[] {
+    let result = [...this.checkInRecords];
+    if (filters?.userId) {
+      result = result.filter((r) => r.userId === filters.userId);
+    }
+    if (filters?.vehicleId) {
+      result = result.filter((r) => r.vehicleId === filters.vehicleId);
+    }
+    if (filters?.routeId) {
+      result = result.filter((r) => r.routeId === filters.routeId);
+    }
+    if (filters?.date) {
+      const dateStart = new Date(filters.date);
+      dateStart.setHours(0, 0, 0, 0);
+      const dateEnd = new Date(filters.date);
+      dateEnd.setHours(23, 59, 59, 999);
+      result = result.filter(
+        (r) => r.checkInTime >= dateStart.getTime() && r.checkInTime <= dateEnd.getTime()
+      );
+    }
+    return result;
+  }
+
+  getRideStats(date: string, routeId?: string): RideStats[] {
+    const routes = routeId
+      ? [this.getRouteById(routeId)].filter(Boolean) as Route[]
+      : this.routes;
+
+    return routes.map((route) => {
+      const records = this.getCheckInRecords({ date, routeId: route.id });
+      const uniqueUsers = new Set(records.map((r) => r.userId));
+
+      const hourlyData: { hour: number; count: number }[] = [];
+      for (let h = 0; h < 24; h++) {
+        const hourRecords = records.filter((r) => {
+          const d = new Date(r.checkInTime);
+          return d.getHours() === h;
+        });
+        hourlyData.push({ hour: h, count: hourRecords.length });
+      }
+
+      const peakHour = hourlyData.reduce(
+        (max, d) => (d.count > max.count ? d : max),
+        { hour: 0, count: 0 }
+      ).hour;
+
+      const stationData = route.stations.map((station) => ({
+        stationId: station.id,
+        stationName: station.name,
+        count: records.filter((r) => r.stationId === station.id).length,
+      }));
+
+      return {
+        date,
+        routeId: route.id,
+        routeName: route.name,
+        totalRides: records.length,
+        uniquePassengers: uniqueUsers.size,
+        peakHour,
+        hourlyData,
+        stationData,
+      };
+    });
+  }
+
+  getUserActiveCheckIn(userId: string): CheckInRecord | undefined {
+    return this.checkInRecords.find(
+      (r) => r.userId === userId && r.status === "active"
+    );
   }
 
   private generateId(prefix: string): string {

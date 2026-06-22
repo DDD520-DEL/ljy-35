@@ -1,21 +1,55 @@
-import { useState, useMemo } from "react";
-import { TrendingUp, BarChart3, History, Calendar, Activity, Users } from "lucide-react";
+import { useState, useMemo, useEffect } from "react";
+import {
+  TrendingUp,
+  BarChart3,
+  History,
+  Calendar,
+  Activity,
+  Users,
+  Clock,
+} from "lucide-react";
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  PieChart,
+  Pie,
+  Cell,
+} from "recharts";
 import Sidebar from "@/components/Sidebar";
 import ParkMap from "@/components/ParkMap";
 import StatsCharts from "@/components/StatsCharts";
 import { useAppStore } from "@/store";
 import { cn } from "@/lib/utils";
 
+const PIE_COLORS = ["#0EA5E9", "#14B8A6", "#8B5CF6", "#F59E0B", "#F43F5E"];
+
 export default function AdminDashboard() {
   const routes = useAppStore((s) => s.routes);
   const vehicles = useAppStore((s) => s.vehicles);
   const punctuality = useAppStore((s) => s.punctualityStats);
-  const [tab, setTab] = useState<"stats" | "trajectory">("stats");
+  const rideStats = useAppStore((s) => s.rideStats);
+  const fetchRideStats = useAppStore((s) => s.fetchRideStats);
+  const [tab, setTab] = useState<"stats" | "ridership" | "trajectory">("stats");
   const [trajectoryRouteId, setTrajectoryRouteId] = useState<string>(routes[0]?.id ?? "");
   const [trajectoryDate, setTrajectoryDate] = useState("2024-01-15");
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackProgress, setPlaybackProgress] = useState(0);
+  const [ridershipDate, setRidershipDate] = useState(
+    new Date().toISOString().split("T")[0]
+  );
+  const [ridershipRouteId, setRidershipRouteId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (tab === "ridership") {
+      void fetchRideStats(ridershipDate, ridershipRouteId ?? undefined);
+    }
+  }, [tab, ridershipDate, ridershipRouteId, fetchRideStats]);
 
   const trajectoryRoute = routes.find((r) => r.id === trajectoryRouteId);
   const routeVehicles = vehicles.filter((v) => v.routeId === trajectoryRouteId);
@@ -83,6 +117,18 @@ export default function AdminDashboard() {
                 准点率统计
               </button>
               <button
+                onClick={() => setTab("ridership")}
+                className={cn(
+                  "flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all",
+                  tab === "ridership"
+                    ? "bg-brand-400/20 text-brand-300"
+                    : "text-slate-400 hover:text-white hover:bg-slate-800/60"
+                )}
+              >
+                <Users size={17} />
+                乘车统计
+              </button>
+              <button
                 onClick={() => setTab("trajectory")}
                 className={cn(
                   "flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all",
@@ -99,6 +145,361 @@ export default function AdminDashboard() {
 
           {tab === "stats" ? (
             <StatsCharts data={punctuality} className="animate-fade-in-up" />
+          ) : tab === "ridership" ? (
+            <div className="space-y-6 animate-fade-in-up" style={{ animationDelay: "100ms" }}>
+              <div className="grid grid-cols-12 gap-6">
+                <div className="col-span-12 lg:col-span-3 space-y-6">
+                  <div className="p-6 rounded-2xl glass border border-slate-700/40">
+                    <div className="flex items-center gap-2 mb-5">
+                      <Calendar size={18} className="text-sky-400" />
+                      <h3 className="font-display font-semibold text-white">统计筛选</h3>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div>
+                        <label className="text-xs text-slate-400 mb-2 block">选择日期</label>
+                        <input
+                          type="date"
+                          value={ridershipDate}
+                          onChange={(e) => setRidershipDate(e.target.value)}
+                          className="w-full p-3 rounded-xl bg-slate-900/80 border border-slate-700/40 text-slate-200 text-sm"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs text-slate-400 mb-2 block">选择线路</label>
+                        <div className="space-y-2">
+                          <button
+                            onClick={() => setRidershipRouteId(null)}
+                            className={cn(
+                              "w-full flex items-center gap-3 p-3 rounded-xl border transition-all text-left",
+                              ridershipRouteId === null
+                                ? "border-sky-500/50 bg-sky-500/10"
+                                : "border-slate-700/40 bg-slate-900/50 hover:bg-slate-800/60"
+                            )}
+                          >
+                            <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center">
+                              <BarChart3 size={14} className="text-slate-400" />
+                            </div>
+                            <span className="text-sm text-white">全部线路</span>
+                          </button>
+                          {routes.map((r) => (
+                            <button
+                              key={r.id}
+                              onClick={() => setRidershipRouteId(r.id)}
+                              className={cn(
+                                "w-full flex items-center gap-3 p-3 rounded-xl border transition-all text-left",
+                                ridershipRouteId === r.id
+                                  ? "border-sky-500/50 bg-sky-500/10"
+                                  : "border-slate-700/40 bg-slate-900/50 hover:bg-slate-800/60"
+                              )}
+                            >
+                              <div
+                                className="w-8 h-8 rounded-lg flex items-center justify-center"
+                                style={{ backgroundColor: `${r.color}22` }}
+                              >
+                                <span
+                                  className="w-2.5 h-2.5 rounded-full"
+                                  style={{ backgroundColor: r.color }}
+                                />
+                              </div>
+                              <span className="text-sm text-white">{r.shortName}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-6 rounded-2xl glass border border-slate-700/40">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Activity size={18} className="text-emerald-400" />
+                      <h3 className="font-display font-semibold text-white">数据概览</h3>
+                    </div>
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-slate-400">总乘车人次</span>
+                        <span className="text-xl font-bold text-white">
+                          {rideStats.reduce((sum, s) => sum + s.totalRides, 0)}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-slate-400">独立乘客</span>
+                        <span className="text-xl font-bold text-white">
+                          {rideStats.reduce((sum, s) => sum + s.uniquePassengers, 0)}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-slate-400">线路数</span>
+                        <span className="text-xl font-bold text-white">
+                          {rideStats.length}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="col-span-12 lg:col-span-9 space-y-6">
+                  <div className="grid grid-cols-3 gap-4">
+                    {[
+                      {
+                        label: "今日总乘车",
+                        value: rideStats.reduce((sum, s) => sum + s.totalRides, 0),
+                        icon: Users,
+                        color: "text-sky-400",
+                        bg: "from-sky-500/15",
+                      },
+                      {
+                        label: "高峰时段",
+                        value:
+                          rideStats.length > 0
+                            ? `${rideStats[0].peakHour}:00`
+                            : "--",
+                        icon: Clock,
+                        color: "text-amber-400",
+                        bg: "from-amber-500/15",
+                      },
+                      {
+                        label: "最忙线路",
+                        value:
+                          rideStats.length > 0
+                            ? rideStats.reduce(
+                                (max, s) =>
+                                  s.totalRides > max.totalRides ? s : max,
+                                rideStats[0]
+                              ).routeName.slice(0, 4)
+                            : "--",
+                        icon: TrendingUp,
+                        color: "text-emerald-400",
+                        bg: "from-emerald-500/15",
+                      },
+                    ].map((s) => (
+                      <div
+                        key={s.label}
+                        className={cn(
+                          "p-5 rounded-2xl glass border border-slate-700/40 bg-gradient-to-br",
+                          s.bg,
+                          "to-transparent"
+                        )}
+                      >
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="text-sm text-slate-400">{s.label}</span>
+                          <s.icon size={18} className={s.color} />
+                        </div>
+                        <div className="font-display font-bold text-2xl text-white count-number">
+                          {s.value}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="p-6 rounded-2xl glass border border-slate-700/40">
+                    <h3 className="font-display font-semibold text-white text-lg mb-4">
+                      小时客流分布
+                    </h3>
+                    <div className="h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                          data={
+                            rideStats.length > 0
+                              ? rideStats[0].hourlyData.map((h) => ({
+                                  hour: `${h.hour}:00`,
+                                  乘车人次: h.count,
+                                }))
+                              : []
+                          }
+                        >
+                          <CartesianGrid
+                            strokeDasharray="3 3"
+                            stroke="rgba(148,163,184,0.08)"
+                          />
+                          <XAxis
+                            dataKey="hour"
+                            stroke="rgba(148,163,184,0.5)"
+                            fontSize={11}
+                            tickLine={false}
+                            axisLine={false}
+                          />
+                          <YAxis
+                            stroke="rgba(148,163,184,0.5)"
+                            fontSize={12}
+                            tickLine={false}
+                            axisLine={false}
+                          />
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: "rgba(15,23,42,0.95)",
+                              border: "1px solid rgba(148,163,184,0.2)",
+                              borderRadius: "12px",
+                              fontSize: 12,
+                              color: "#fff",
+                            }}
+                          />
+                          <Bar
+                            dataKey="乘车人次"
+                            fill="#0EA5E9"
+                            radius={[6, 6, 0, 0]}
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-6">
+                    <div className="p-6 rounded-2xl glass border border-slate-700/40">
+                      <h3 className="font-display font-semibold text-white text-lg mb-4">
+                        各线路客流对比
+                      </h3>
+                      <div className="h-56">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart
+                            data={rideStats.map((s) => ({
+                              name: s.routeName.replace("园区", "").replace("线", ""),
+                              乘车人次: s.totalRides,
+                            }))}
+                            layout="vertical"
+                          >
+                            <CartesianGrid
+                              strokeDasharray="3 3"
+                              stroke="rgba(148,163,184,0.08)"
+                            />
+                            <XAxis
+                              type="number"
+                              stroke="rgba(148,163,184,0.5)"
+                              fontSize={11}
+                              tickLine={false}
+                              axisLine={false}
+                            />
+                            <YAxis
+                              dataKey="name"
+                              type="category"
+                              stroke="rgba(148,163,184,0.5)"
+                              fontSize={12}
+                              tickLine={false}
+                              axisLine={false}
+                            />
+                            <Tooltip
+                              contentStyle={{
+                                backgroundColor: "rgba(15,23,42,0.95)",
+                                border: "1px solid rgba(148,163,184,0.2)",
+                                borderRadius: "12px",
+                                fontSize: 12,
+                                color: "#fff",
+                              }}
+                            />
+                            <Bar
+                              dataKey="乘车人次"
+                              fill="#8B5CF6"
+                              radius={[0, 6, 6, 0]}
+                            />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+
+                    <div className="p-6 rounded-2xl glass border border-slate-700/40">
+                      <h3 className="font-display font-semibold text-white text-lg mb-4">
+                        站点客流分布
+                      </h3>
+                      <div className="h-56">
+                        <ResponsiveContainer width="100%" height="100%">
+                          {rideStats.length > 0 && rideStats[0].stationData.length > 0 ? (
+                            <PieChart>
+                              <Pie
+                                data={rideStats[0].stationData
+                                  .filter((s) => s.count > 0)
+                                  .slice(0, 6)
+                                  .map((s) => ({
+                                    name: s.stationName.slice(0, 4),
+                                    value: s.count,
+                                  }))}
+                                cx="50%"
+                                cy="50%"
+                                innerRadius={45}
+                                outerRadius={75}
+                                paddingAngle={3}
+                                dataKey="value"
+                              >
+                                {rideStats[0].stationData.map((_, i) => (
+                                  <Cell
+                                    key={i}
+                                    fill={PIE_COLORS[i % PIE_COLORS.length]}
+                                    stroke="rgba(15,23,42,0.9)"
+                                    strokeWidth={2}
+                                  />
+                                ))}
+                              </Pie>
+                              <Tooltip
+                                contentStyle={{
+                                  backgroundColor: "rgba(15,23,42,0.95)",
+                                  border: "1px solid rgba(148,163,184,0.2)",
+                                  borderRadius: "12px",
+                                  fontSize: 12,
+                                  color: "#fff",
+                                }}
+                              />
+                            </PieChart>
+                          ) : (
+                            <div className="h-full flex items-center justify-center text-slate-500 text-sm">
+                              暂无数据
+                            </div>
+                          )}
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-6 rounded-2xl glass border border-slate-700/40">
+                    <h3 className="font-display font-semibold text-white text-lg mb-4">
+                      各线路详情
+                    </h3>
+                    <div className="space-y-4">
+                      {rideStats.map((stat, i) => (
+                        <div
+                          key={stat.routeId}
+                          className="p-4 rounded-xl bg-slate-800/30 border border-slate-700/40"
+                        >
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-3">
+                              <span
+                                className="w-3 h-3 rounded-full"
+                                style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }}
+                              />
+                              <span className="font-medium text-white">
+                                {stat.routeName}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-4 text-sm">
+                              <span className="text-slate-400">
+                                乘车人次: <span className="text-white font-semibold">{stat.totalRides}</span>
+                              </span>
+                              <span className="text-slate-400">
+                                独立乘客: <span className="text-white font-semibold">{stat.uniquePassengers}</span>
+                              </span>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-6 gap-2">
+                            {stat.stationData.map((s) => (
+                              <div
+                                key={s.stationId}
+                                className="p-2 rounded-lg bg-slate-900/50 text-center"
+                              >
+                                <div className="text-xs text-slate-500 truncate">
+                                  {s.stationName}
+                                </div>
+                                <div className="text-sm font-bold text-white mt-1">
+                                  {s.count}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           ) : (
             <div className="space-y-6 animate-fade-in-up" style={{ animationDelay: "100ms" }}>
               <div className="grid grid-cols-12 gap-6">

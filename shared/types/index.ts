@@ -139,3 +139,45 @@ export interface Toast {
 }
 
 export type UserRole = "passenger" | "driver" | "admin" | null;
+
+export interface CheckInRecord {
+  id: string;
+  userId: string;
+  vehicleId: string;
+  routeId: string;
+  stationId: string;
+  checkInTime: number;
+  tripId: string;
+  status: "active" | "completed" | "cancelled";
+}
+
+export interface QRCodePayload {
+  vehicleId: string;
+  routeId: string;
+  tripId: string;
+  stationId: string;
+  timestamp: number;
+  token: string;
+}
+
+export interface RideStats {
+  date: string;
+  routeId: string;
+  routeName: string;
+  totalRides: number;
+  uniquePassengers: number;
+  peakHour: number;
+  hourlyData: { hour: number; count: number }[];
+  stationData: { stationId: string; stationName: string; count: number }[];
+}
+
+export interface ActiveTrip {
+  id: string;
+  vehicleId: string;
+  routeId: string;
+  startTime: number;
+  startStationId: string;
+  currentStationIndex: number;
+  passengerCount: number;
+  checkInRecords: CheckInRecord[];
+}

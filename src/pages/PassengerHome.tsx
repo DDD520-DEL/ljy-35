@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
-import { Search, Filter, Bell, RefreshCw, Locate } from "lucide-react";
+import { useMemo, useState, useEffect } from "react";
+import { Search, Filter, Bell, RefreshCw, Locate, QrCode, Ticket } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import ParkMap from "@/components/ParkMap";
 import RouteCard from "@/components/RouteCard";
+import CheckInModal from "@/components/CheckInModal";
 import { useAppStore } from "@/store";
 import { cn } from "@/lib/utils";
 
@@ -10,9 +11,16 @@ export default function PassengerHome() {
   const routes = useAppStore((s) => s.routes);
   const vehicles = useAppStore((s) => s.vehicles);
   const reminders = useAppStore((s) => s.reminders);
+  const activeCheckIn = useAppStore((s) => s.activeCheckIn);
+  const fetchActiveCheckIn = useAppStore((s) => s.fetchActiveCheckIn);
   const [search, setSearch] = useState("");
   const [highlightRouteId, setHighlightRouteId] = useState<string | null>(null);
   const [filterActive, setFilterActive] = useState(false);
+  const [checkInModalOpen, setCheckInModalOpen] = useState(false);
+
+  useEffect(() => {
+    void fetchActiveCheckIn();
+  }, [fetchActiveCheckIn]);
 
   const filteredRoutes = useMemo(() => {
     let result = routes;
@@ -58,6 +66,27 @@ export default function PassengerHome() {
             </div>
 
             <div className="flex items-center gap-3">
+              <button
+                onClick={() => setCheckInModalOpen(true)}
+                className={cn(
+                  "flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all",
+                  activeCheckIn
+                    ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                    : "bg-gradient-to-r from-sky-500 to-blue-500 text-white hover:shadow-[0_0_24px_rgba(14,165,233,0.4)]"
+                )}
+              >
+                {activeCheckIn ? (
+                  <>
+                    <Ticket size={18} />
+                    <span className="text-sm">已乘车</span>
+                  </>
+                ) : (
+                  <>
+                    <QrCode size={18} />
+                    <span className="text-sm">扫码签到</span>
+                  </>
+                )}
+              </button>
               <button
                 onClick={() => setHighlightRouteId(null)}
                 className="p-2.5 rounded-xl border border-slate-700/40 bg-slate-900/50 text-slate-400 hover:text-white hover:bg-slate-800/60 transition-all"
@@ -185,6 +214,11 @@ export default function PassengerHome() {
           </div>
         </div>
       </main>
+
+      <CheckInModal
+        isOpen={checkInModalOpen}
+        onClose={() => setCheckInModalOpen(false)}
+      />
     </div>
   );
 }
