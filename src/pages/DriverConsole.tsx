@@ -15,8 +15,7 @@ import {
 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import { useAppStore } from "@/store";
-import { useVehicleSimulation } from "@/hooks/useVehicleSimulation";
-import { formatDuration, getPositionOnPath } from "@/utils/geometry";
+import { formatDuration } from "@/utils/geometry";
 import { cn } from "@/lib/utils";
 import type { Route } from "@shared/types";
 
@@ -28,14 +27,12 @@ export default function DriverConsole() {
   const driverVehicleId = useAppStore((s) => s.driverVehicleId);
   const setDriverVehicleId = useAppStore((s) => s.setDriverVehicleId);
   const addToast = useAppStore((s) => s.addToast);
-  useVehicleSimulation();
 
   const [selectedRouteId, setSelectedRouteId] = useState<string>(routes[0]?.id ?? "");
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>(
     driverVehicleId ?? vehicles.filter((v) => v.routeId === routes[0]?.id)[0]?.id ?? ""
   );
   const [isRunning, setIsRunning] = useState(false);
-  const [simulateTimer, setSimulateTimer] = useState<number | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
@@ -53,24 +50,8 @@ export default function DriverConsole() {
       setElapsedSeconds((s) => s + 1);
     }, 1000);
 
-    const sim = window.setInterval(() => {
-      const current = useAppStore.getState().vehicles.find((v) => v.id === selectedVehicleId);
-      if (!current) return;
-      let nextProgress = current.progress + 0.005;
-      if (nextProgress >= 1) {
-        nextProgress = 0;
-        stopDriving(true);
-        return;
-      }
-      const pos = getPositionOnPath(route.pathPoints, nextProgress);
-      const stationIdx = Math.floor(nextProgress * (route.stations.length - 1));
-      updateVehicleProgress(selectedVehicleId, nextProgress, pos, stationIdx);
-    }, 1500);
-
-    setSimulateTimer(Number(sim));
     return () => {
       clearInterval(interval);
-      clearInterval(sim);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isRunning, selectedVehicleId]);
@@ -101,8 +82,6 @@ export default function DriverConsole() {
     if (!vehicle) return;
     updateVehicleStatus(vehicle.id, "idle");
     setIsRunning(false);
-    if (simulateTimer) clearInterval(simulateTimer);
-    setSimulateTimer(null);
     addToast({
       type: completed ? "success" : "info",
       message: completed

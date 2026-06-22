@@ -90,7 +90,7 @@ export default function StationTimeline({
                   {vehiclesAtStation.map((v) => (
                 <div
                   key={v.id}
-                  className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px font-bold text-white animate-float shadow-lg"
+                  className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold text-white animate-float shadow-lg"
                   style={{ backgroundColor: route.color }}
                 >
                   <Bus size={12} />

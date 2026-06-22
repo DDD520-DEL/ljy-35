@@ -4,7 +4,6 @@ import Sidebar from "@/components/Sidebar";
 import ParkMap from "@/components/ParkMap";
 import StatsCharts from "@/components/StatsCharts";
 import { useAppStore } from "@/store";
-import { useVehicleSimulation } from "@/hooks/useVehicleSimulation";
 import { cn } from "@/lib/utils";
 
 export default function AdminDashboard() {
@@ -17,7 +16,6 @@ export default function AdminDashboard() {
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackProgress, setPlaybackProgress] = useState(0);
-  useVehicleSimulation();
 
   const trajectoryRoute = routes.find((r) => r.id === trajectoryRouteId);
   const routeVehicles = vehicles.filter((v) => v.routeId === trajectoryRouteId);

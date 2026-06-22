@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import RoleSelect from "@/pages/RoleSelect";
 import PassengerHome from "@/pages/PassengerHome";

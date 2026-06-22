@@ -4,7 +4,6 @@ import Sidebar from "@/components/Sidebar";
 import ParkMap from "@/components/ParkMap";
 import RouteCard from "@/components/RouteCard";
 import { useAppStore } from "@/store";
-import { useVehicleSimulation } from "@/hooks/useVehicleSimulation";
 import { cn } from "@/lib/utils";
 
 export default function PassengerHome() {
@@ -14,7 +13,6 @@ export default function PassengerHome() {
   const [search, setSearch] = useState("");
   const [highlightRouteId, setHighlightRouteId] = useState<string | null>(null);
   const [filterActive, setFilterActive] = useState(false);
-  useVehicleSimulation();
 
   const filteredRoutes = useMemo(() => {
     let result = routes;

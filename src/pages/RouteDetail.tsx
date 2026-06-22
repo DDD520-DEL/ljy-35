@@ -15,7 +15,6 @@ import ParkMap from "@/components/ParkMap";
 import StationTimeline from "@/components/StationTimeline";
 import CrowdFeedback from "@/components/CrowdFeedback";
 import { useAppStore } from "@/store";
-import { useVehicleSimulation } from "@/hooks/useVehicleSimulation";
 import { calculateETA, getCrowdColor, getCrowdText, formatDuration } from "@/utils/geometry";
 import type { Station, Vehicle } from "@shared/types";
 import { cn } from "@/lib/utils";
@@ -32,7 +31,6 @@ export default function RouteDetail() {
   const [selectedStationId, setSelectedStationId] = useState<string | null>(null);
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
   const [reminderStationOpen, setReminderStationOpen] = useState(false);
-  useVehicleSimulation();
 
   const route = routes.find((r) => r.id === id);
   const routeVehicles = useMemo(

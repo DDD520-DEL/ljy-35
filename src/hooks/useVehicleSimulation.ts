@@ -1,4 +1,3 @@
-import { useEffect, useRef } from "react";
 import { useAppStore } from "@/store";
 import { getPositionOnPath, getCurrentStationIndex } from "@/utils/geometry";
 import type { Route, Vehicle } from "@shared/types";
@@ -6,22 +5,22 @@ import type { Route, Vehicle } from "@shared/types";
 const PROGRESS_INCREMENT_PER_TICK = 0.008;
 const TICK_INTERVAL_MS = 2000;
 
-export const useVehicleSimulation = () => {
-  const routes = useAppStore((s) => s.routes);
-  const vehicles = useAppStore((s) => s.vehicles);
-  const updateVehicleProgress = useAppStore((s) => s.updateVehicleProgress);
-  const addToast = useAppStore((s) => s.addToast);
-  const reminders = useAppStore((s) => s.reminders);
-  const markReminderNotified = useAppStore((s) => s.markReminderNotified);
-  const timerRef = useRef<number | null>(null);
+let nextTimerId: number | null = null;
+let isInitialized = false;
 
-  useEffect(() => {
-    const routeMap = new Map<string, Route>();
-    routes.forEach((r) => routeMap.set(r.id, r));
+export const startVehicleSimulation = () => {
+  if (isInitialized) return;
+  isInitialized = true;
 
-    const tick = () => {
-      const currentVehicles = useAppStore.getState().vehicles;
-      currentVehicles.forEach((vehicle: Vehicle) => {
+  const tick = () => {
+    try {
+      const state = useAppStore.getState();
+      const { routes, vehicles, updateVehicleProgress, addToast, markReminderNotified } = state;
+
+      const routeMap = new Map<string, Route>();
+      routes.forEach((r) => routeMap.set(r.id, r));
+
+      vehicles.forEach((vehicle: Vehicle) => {
         if (vehicle.status !== "running") return;
         const route = routeMap.get(vehicle.routeId);
         if (!route) return;
@@ -61,14 +60,17 @@ export const useVehicleSimulation = () => {
           }
         });
       });
-    };
+    } catch (err) {
+      console.error("[VehicleSim] tick error:", err);
+    } finally {
+      nextTimerId = window.setTimeout(tick, TICK_INTERVAL_MS);
+    }
+  };
 
-    timerRef.current = window.setInterval(tick, TICK_INTERVAL_MS);
-    return () => {
-      if (timerRef.current) window.clearInterval(timerRef.current);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [routes.length]);
+  nextTimerId = window.setTimeout(tick, TICK_INTERVAL_MS);
+};
 
+export const useVehicleSimulation = () => {
+  const vehicles = useAppStore((s) => s.vehicles);
   return { vehicles };
 };
