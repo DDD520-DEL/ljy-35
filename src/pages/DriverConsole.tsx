@@ -18,7 +18,7 @@ import {
 import Sidebar from "@/components/Sidebar";
 import QRCodeDisplay from "@/components/QRCodeDisplay";
 import { useAppStore } from "@/store";
-import { formatDuration } from "@/utils/geometry";
+import { formatDuration, getPositionOnPath } from "@/utils/geometry";
 import { cn } from "@/lib/utils";
 import type { Route } from "@shared/types";
 
@@ -56,6 +56,49 @@ export default function DriverConsole() {
     const interval = window.setInterval(() => {
       setElapsedSeconds((s) => s + 1);
     }, 1000);
+
+    return () => {
+      clearInterval(interval);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isRunning, selectedVehicleId]);
+
+  useEffect(() => {
+    if (!isRunning || !vehicle || !route) return;
+
+    let progress = vehicle.progress;
+    let stationIndex = vehicle.currentStationIndex;
+    const totalStations = route.stations.length;
+    const stationInterval = 250;
+
+    const interval = window.setInterval(() => {
+      progress = Math.min(1, progress + 0.004);
+      const totalSegments = totalStations - 1;
+      const newStationIndex = Math.min(
+        totalSegments,
+        Math.floor(progress * totalSegments)
+      );
+
+      if (newStationIndex !== stationIndex) {
+        stationIndex = newStationIndex;
+        const newStationId = route.stations[stationIndex]?.id;
+        if (newStationId) {
+          void generateQRCode(vehicle.id, newStationId);
+          addToast({
+            type: "info",
+            message: `到达 ${route.stations[stationIndex]?.name ?? "下一站"}，签到码已更新`,
+            duration: 2500,
+          });
+        }
+      }
+
+      const position = getPositionOnPath(route.pathPoints, progress);
+      updateVehicleProgress(vehicle.id, progress, position, stationIndex);
+
+      if (stationIndex >= totalStations - 1 && progress >= 0.999) {
+        stopDriving(true);
+      }
+    }, stationInterval);
 
     return () => {
       clearInterval(interval);

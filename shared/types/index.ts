@@ -171,6 +171,14 @@ export interface RideStats {
   stationData: { stationId: string; stationName: string; count: number }[];
 }
 
+export interface CheckInRecordDetail extends CheckInRecord {
+  vehiclePlate: string;
+  routeName: string;
+  stationName: string;
+  crowdLevel: CrowdLevel;
+  passengerCount?: number;
+}
+
 export interface ActiveTrip {
   id: string;
   vehicleId: string;
@@ -180,4 +188,17 @@ export interface ActiveTrip {
   currentStationIndex: number;
   passengerCount: number;
   checkInRecords: CheckInRecord[];
+}
+
+export interface QRCodeData {
+  token: string;
+  tripId: string;
+  expiresAt: number;
+  qrData: string;
+  passengerCount: number;
+  routeName: string;
+  stationName: string;
+  vehicleId: string;
+  routeId: string;
+  stationId: string;
 }

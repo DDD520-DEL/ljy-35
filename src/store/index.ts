@@ -9,8 +9,10 @@ import type {
   CrowdLevel,
   ApiResponse,
   CheckInRecord,
+  CheckInRecordDetail,
   RideStats,
   ActiveTrip,
+  QRCodeData,
 } from "@shared/types";
 import { MOCK_ROUTES, MOCK_VEHICLES, MOCK_PUNCTUALITY_STATS } from "@/data/mockData";
 
@@ -28,18 +30,10 @@ interface AppState {
   driverVehicleId: string | null;
   lastServerSync: number;
   checkInRecords: CheckInRecord[];
-  activeCheckIn: CheckInRecord | null;
+  activeCheckIn: CheckInRecordDetail | null;
   rideStats: RideStats[];
   activeTrip: ActiveTrip | null;
-  qrCodeData: {
-    token: string;
-    tripId: string;
-    expiresAt: number;
-    qrData: string;
-    passengerCount: number;
-    routeName: string;
-    stationName: string;
-  } | null;
+  qrCodeData: QRCodeData | null;
 
   setUserRole: (role: UserRole) => void;
   setSelectedRouteId: (id: string | null) => void;
@@ -53,7 +47,7 @@ interface AppState {
   generateQRCode: (vehicleId: string, stationId: string) => Promise<void>;
   refreshQRCode: () => Promise<void>;
   clearQRCode: () => void;
-  passengerCheckIn: (token: string) => Promise<CheckInRecord | null>;
+  passengerCheckIn: (token: string) => Promise<CheckInRecordDetail | null>;
   fetchActiveCheckIn: () => Promise<void>;
   fetchRideStats: (date: string, routeId?: string) => Promise<void>;
   fetchCheckInRecords: (filters?: { userId?: string; vehicleId?: string; routeId?: string; date?: string }) => Promise<void>;
@@ -181,15 +175,7 @@ export const useAppStore = create<AppState>((set, get) => {
 
     generateQRCode: async (vehicleId, stationId) => {
       try {
-        const res = await apiFetch<{
-          token: string;
-          tripId: string;
-          expiresAt: number;
-          qrData: string;
-          passengerCount: number;
-          routeName: string;
-          stationName: string;
-        }>("/checkin/qrcode/generate", {
+        const res = await apiFetch<QRCodeData>("/checkin/qrcode/generate", {
           method: "POST",
           body: JSON.stringify({ vehicleId, stationId }),
         });
@@ -226,13 +212,7 @@ export const useAppStore = create<AppState>((set, get) => {
 
     passengerCheckIn: async (token) => {
       try {
-        const res = await apiFetch<CheckInRecord & {
-          vehiclePlate: string;
-          routeName: string;
-          stationName: string;
-          crowdLevel: CrowdLevel;
-          passengerCount: number;
-        }>("/checkin/checkin", {
+        const res = await apiFetch<CheckInRecordDetail>("/checkin/checkin", {
           method: "POST",
           body: JSON.stringify({ token, userId: MOCK_USER_ID }),
         });
@@ -257,11 +237,7 @@ export const useAppStore = create<AppState>((set, get) => {
 
     fetchActiveCheckIn: async () => {
       try {
-        const res = await apiFetch<CheckInRecord & {
-          vehiclePlate: string;
-          routeName: string;
-          crowdLevel: CrowdLevel;
-        }>(`/checkin/active/${MOCK_USER_ID}`);
+        const res = await apiFetch<CheckInRecordDetail>(`/checkin/active/${MOCK_USER_ID}`);
 
         if (res.success && res.data) {
           set({ activeCheckIn: res.data });

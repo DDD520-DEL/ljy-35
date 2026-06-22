@@ -100,7 +100,7 @@ export default function CheckInModal({ isOpen, onClose }: CheckInModalProps) {
         </div>
 
         <div className="p-6">
-          {activeCheckIn && "routeName" in activeCheckIn ? (
+          {activeCheckIn ? (
             <div className="space-y-5">
               <div className="flex items-center justify-center py-6">
                 <div className="w-20 h-20 rounded-full bg-emerald-500/20 flex items-center justify-center animate-pulse">
@@ -120,7 +120,7 @@ export default function CheckInModal({ isOpen, onClose }: CheckInModalProps) {
                     <span className="text-sm text-slate-400">线路</span>
                   </div>
                   <span className="text-sm font-medium text-white">
-                    {(activeCheckIn as { routeName?: string }).routeName}
+                    {activeCheckIn.routeName || checkInRoute?.name || "--"}
                   </span>
                 </div>
 
@@ -130,7 +130,7 @@ export default function CheckInModal({ isOpen, onClose }: CheckInModalProps) {
                     <span className="text-sm text-slate-400">上车站点</span>
                   </div>
                   <span className="text-sm font-medium text-white">
-                    {(activeCheckIn as { stationName?: string }).stationName}
+                    {activeCheckIn.stationName || "--"}
                   </span>
                 </div>
 
@@ -142,11 +142,11 @@ export default function CheckInModal({ isOpen, onClose }: CheckInModalProps) {
                   <span
                     className={cn(
                       "text-sm font-medium px-2.5 py-1 rounded-full",
-                      crowdLevelConfig[(activeCheckIn as { crowdLevel?: CrowdLevel }).crowdLevel ?? "normal"].color,
-                      crowdLevelConfig[(activeCheckIn as { crowdLevel?: CrowdLevel }).crowdLevel ?? "normal"].bg
+                      crowdLevelConfig[activeCheckIn.crowdLevel ?? "normal"].color,
+                      crowdLevelConfig[activeCheckIn.crowdLevel ?? "normal"].bg
                     )}
                   >
-                    {crowdLevelConfig[(activeCheckIn as { crowdLevel?: CrowdLevel }).crowdLevel ?? "normal"].label}
+                    {crowdLevelConfig[activeCheckIn.crowdLevel ?? "normal"].label}
                   </span>
                 </div>
 

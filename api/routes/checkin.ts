@@ -127,6 +127,8 @@ router.get('/active/:userId', (req: Request, res: Response) => {
 
   const vehicle = dataStore.getVehicleById(record.vehicleId)
   const route = dataStore.getRouteById(record.routeId)
+  const station = route?.stations.find((s) => s.id === record.stationId)
+  const trip = dataStore.getActiveTrip(record.vehicleId)
 
   res.json({
     success: true,
@@ -134,7 +136,9 @@ router.get('/active/:userId', (req: Request, res: Response) => {
       ...record,
       vehiclePlate: vehicle?.plateNumber ?? '',
       routeName: route?.name ?? '',
+      stationName: station?.name ?? '',
       crowdLevel: vehicle?.crowdLevel ?? 'normal',
+      passengerCount: trip?.passengerCount ?? 0,
     },
   })
 })

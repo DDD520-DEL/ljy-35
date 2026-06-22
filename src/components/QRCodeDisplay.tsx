@@ -28,11 +28,18 @@ export default function QRCodeDisplay({
   const [timeLeft, setTimeLeft] = useState(60);
   const [copied, setCopied] = useState(false);
 
+  const [hasTriggeredRefresh, setHasTriggeredRefresh] = useState(false);
+
+  useEffect(() => {
+    setHasTriggeredRefresh(false);
+  }, [expiresAt]);
+
   useEffect(() => {
     const updateTimeLeft = () => {
       const remaining = Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000));
       setTimeLeft(remaining);
-      if (remaining <= 5) {
+      if (remaining <= 5 && !hasTriggeredRefresh) {
+        setHasTriggeredRefresh(true);
         onRefresh();
       }
     };
@@ -40,7 +47,7 @@ export default function QRCodeDisplay({
     updateTimeLeft();
     const interval = setInterval(updateTimeLeft, 1000);
     return () => clearInterval(interval);
-  }, [expiresAt, onRefresh]);
+  }, [expiresAt, onRefresh, hasTriggeredRefresh]);
 
   const qrPattern = useMemo(() => {
     const size = 21;
